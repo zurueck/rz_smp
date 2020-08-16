@@ -1,19 +1,25 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include "rz_rbuf.h"
+
 
 struct rz_rbuf* rz_rbuf_create(int size)
 {
     struct rz_rbuf *buf = (struct rz_rbuf*)malloc(sizeof(struct rz_rbuf));
     if (!buf) {
-        return 0;
+        return RZ_RBUF_SUCCESS;
     }
 
     //do buffer
-    buf->start = (char*)malloc(sizeof(char) * size);
+    buf->start = (unsigned char*)malloc(sizeof(char) * size);
     if (!buf->start) {
         free(buf);
-        return 0;
+        return RZ_RBUF_SUCCESS;
     }
+
+    buf->end = buf->start + size;
+    buf->tail = buf->head = buf->start;
+    buf->count = 0;
 
     return buf;
 }
@@ -24,12 +30,12 @@ void rz_rbuf_delete(struct rz_rbuf* buf)
     free(buf);
 }
 
-int rz_rbuf_push(struct rz_rbuf *buf, char value) 
+int rz_rbuf_push(struct rz_rbuf *buf, unsigned char value) 
 {
     
     //check length
-    if (buf->count = buf->end - buf->start) {
-        return -1;
+    if (buf->count == buf->end - buf->start) {
+        return RZ_RBUF_FAIL;
     }
 
     *buf->tail = value;
@@ -38,13 +44,13 @@ int rz_rbuf_push(struct rz_rbuf *buf, char value)
     if (buf->tail == buf->end) {
         buf->tail = buf->start;
     }
-    return 0;
+    return RZ_RBUF_SUCCESS;
 }
 
-int rz_rbuf_pop(struct rz_rbuf *buf, char *value) 
+int rz_rbuf_pop(struct rz_rbuf *buf, unsigned char *value) 
 {
     
-    if (!buf->count) {return -1;}
+    if (!buf->count) {return RZ_RBUF_FAIL;}
 
     buf->count--;
     *value = *buf->head++;
@@ -52,26 +58,17 @@ int rz_rbuf_pop(struct rz_rbuf *buf, char *value)
         buf->head = buf->start;
     }
     
-    return 0;
+    return RZ_RBUF_SUCCESS;
 }
 
 int rz_rbuf_get_count(struct rz_rbuf *buf)
 {
-    int cnt;
-    int size;
-
-    size = buf->end - buf->start;
-    cnt = buf->tail - buf->head;
-    if (cnt < 0) {
-        cnt += size;    
-    }
-
-    return cnt;
+    return buf->count;
 }
 
-void rz_rbuf_clear_buf(struct rz_rbuf *buf) 
+void rz_rbuf_clear(struct rz_rbuf *buf) 
 {
-    char *ptr;
+    unsigned char *ptr;
     int m;
 
     //to 0
@@ -85,25 +82,19 @@ void rz_rbuf_clear_buf(struct rz_rbuf *buf)
     buf->count = 0;
 }
 
-void rz_rbuf_head_offset(struct rz_rbuf *buf, int offset)
+int rz_rbuf_head_offset(struct rz_rbuf *buf, int offset)
 {
+
+    if (buf->count < offset) {
+        return RZ_RBUF_FAIL;
+    }
 
     buf->head += offset;
     if (buf->head > buf->end) {
         buf->head = buf->start + (buf->head - buf->end);
     }
+    buf->count -= offset;
+
+    return RZ_RBUF_SUCCESS;
 }
-
-void rz_rbuf_head_jump(struct rz_rbuf *buf, char * new_head)
-{
-    int len;
-
-    len = new_head - buf->head;
-    if (len < 0) {
-        len += buf->end - buf->start;
-    }
-    buf->count -= len;
-    buf->head = new_head;
-}
-
 
