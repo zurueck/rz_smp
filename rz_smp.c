@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "core.h"
+#include "rz_smp.h"
 
 
 static struct smp_descriptor* find_desc_name(struct smp_s *smp, const char *str) 

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "core.h"
+#include "rz_smp.h"
 
 
 struct smp_descriptor desc[] = {
