@@ -6,6 +6,7 @@
 #define CONFIG_SMP_DIR_DESC             0
 #define CONFIG_SMP_CALLBACK             0
 #define CONFIG_SMP_AUTO_DO_PACKET       0
+#define CONFIG_SMP_FIXED_LENG           0
 /* ======== end configs ======== */
 
 #define SMP_RES_OK                      0

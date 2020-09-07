@@ -51,6 +51,9 @@ static int get_extra_len(struct smp_s *smp)
 
 static int get_intra_len(struct smp_s *smp) 
 {
+#if CONFIG_SMP_FIXED_LENG
+    return 0;
+#else
     struct smp_descriptor *desc = smp->desc;
     int intra_len = 0;
     int m;
@@ -61,12 +64,14 @@ static int get_intra_len(struct smp_s *smp)
         }
     }
     return intra_len;
+#endif
 }
 
 // 0 = not get
 static int get_cmd_len(struct smp_s *smp) 
 {
     struct smp_descriptor *desc;
+#if !CONFIG_SMP_FIXED_LENG
     unsigned char *bufp;
     int cmd_len = 0, offset;
     int m;
@@ -87,6 +92,11 @@ static int get_cmd_len(struct smp_s *smp)
             bufp = smp->buf->start; 
         }
     }
+#else
+    desc = find_desc_name(smp, "PAYL");
+    return desc->size
+#endif
+
     return cmd_len;
 }
 
