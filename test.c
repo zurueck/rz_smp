@@ -2,8 +2,8 @@
 #include <assert.h>
 #include "rz_smp.h"
 
-#define OMG     1
-#define KEYI    0
+#define OMG     0
+#define KEYI    1
 
 
 #if OMG 
@@ -38,14 +38,21 @@ unsigned char s3[] = {0xBB, 0xAA, 0x02, 0xAA, 0x03, 0x01, 0x0A, 0x0E};
 void callback(char* buf, int len) {
 
     for (int m=0; m<len; m++) {
-        printf("%d = 0x%02X\n", m, *(buf+m));
+        printf("%d = 0x%02X\n", m, (unsigned char)*(buf+m));
     }
 }    //call back
 
+void my_phy_tx(struct smp_s* smp, unsigned char* buf, int len) 
+{
+    for (int m = 0; m < len; m++) {
+        printf("tx[%d] = 0x%02X\n", m, buf[m]);
+    }
+}
 
 static struct smp_s s_smp = {
     .payload_upper_tx = callback,
-    .max_cmd_len = 20,
+    .max_cmd_len = 50,
+    .phy_tx = my_phy_tx,
 };
 
 
@@ -86,36 +93,47 @@ int main(int argc, char *argv[]) {
     assert(smp->packet_flag);
 
 #if OMG
-    c = get_payload(smp, aa);
-    assert(c == 2);
-    assert(aa[0] == 0x01);
-    assert(aa[1] == 0x0A);
+    //c = get_payload(smp, aa);
+    //assert(c == 2);
+    //assert(aa[0] == 0x01);
+    //assert(aa[1] == 0x0A);
 
-    do_packet(smp);
-    c = get_payload(smp, aa);
-    assert(c == 2);
-    assert(aa[0] == 0x01);
-    assert(aa[1] == 0x03);
+    //do_packet(smp);
+    //c = get_payload(smp, aa);
+    //assert(c == 2);
+    //assert(aa[0] == 0x01);
+    //assert(aa[1] == 0x03);
+
+    //tx
+    unsigned char t1[] = {0x03, 0x10, 0x04};
+    smp_send_data(smp, t1, sizeof(t1));
+
+
+
 #endif
 
 #if KEYI
 //unsigned char s1[] = {0xBB, 0xAA, 0x03, 0x01, 0x03, 0x01, 0x02, 0x03, 0x06, 0x3D};
-    printf("extra_len = %d\n", smp->extra_len);
-
-    c = get_payload(smp, aa);
-    assert(c == 6);
-    assert(aa[0] == 0x03);
-    assert(aa[1] == 0x01);
-    assert(aa[2] == 0x03);
-    assert(aa[3] == 0x01);
-    assert(aa[4] == 0x02);
-    assert(aa[5] == 0x03);
+//    printf("extra_len = %d\n", smp->extra_len);
+//
+//    c = get_payload(smp, aa);
+//    assert(c == 6);
+//    assert(aa[0] == 0x03);
+//    assert(aa[1] == 0x01);
+//    assert(aa[2] == 0x03);
+//    assert(aa[3] == 0x01);
+//    assert(aa[4] == 0x02);
+//    assert(aa[5] == 0x03);
 
   //  do_packet(smp);
   //  c = get_payload(smp, aa);
   //  assert(c == 2);
   //  assert(aa[0] == 0x01);
   //  assert(aa[1] == 0x03);
+  
+  //tx
+    unsigned char t1[] = {0x03, 0x01, 0x03, 0x04, 0x11, 0x01};
+    smp_send_data(smp, t1, sizeof(t1));
 
 
 #endif
