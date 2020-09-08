@@ -12,16 +12,21 @@
 #define SMP_RES_OK                      0
 #define SMP_RES_ERROR                   -1
 
+#define DESC_TYPE_FIXED_VALUE       0x04
 #define DESC_TYPE_PAYLOAD           0x08
-#define DESC_TYPE_DIR_IN            0x10
-#define DESC_TYPE_DIR_OUT           0x20
+//#define DESC_TYPE_DIR_IN            0x10
+//#define DESC_TYPE_DIR_OUT           0x20
 #define DESC_TYPE_IN_LEN            0x40
 #define DESC_TYPE_IN_CS             0x80
+#define DESC_CTYPE_CS               0x100        //check sum
+#define DESC_CTYPE_CRC8             0x200       //CRC-8(9bit)
+#define DESC_CTYPE_NP               0x400        //nibble parity
+#define DESC_CTYPE_MJ               0x800        //majority rule
 
 
 struct smp_descriptor {
     char *name;
-    char type;
+    unsigned short type;
     int size;
     int value;
 };
@@ -51,6 +56,8 @@ struct smp_s {
     unsigned char packet_flag :1;
     unsigned char reserved :4;
 
+    int intra_len;
+    int extra_len;
     int max_cmd_len;
 
     void (*phy_tx)(struct smp_s*, char*, int);  //low level tx
@@ -62,6 +69,5 @@ void do_packet(struct smp_s *smp);
 int phy_rx(struct smp_s *smp, char* s, int len);
 int get_payload(struct smp_s *smp, char* buf);
 //add zero copy function later
-
 
 #endif //CORE_H

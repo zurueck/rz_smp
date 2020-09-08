@@ -34,19 +34,23 @@ static int find_offset_name(struct smp_s *smp, const char *str)
     return 0;
 }
 
-static int get_extra_len(struct smp_s *smp) 
-{
+static int get_len_by_type(struct smp_s *smp, unsigned char type) {
     struct smp_descriptor *desc = smp->desc;
-    int extra_len = 0;
+    int type_len = 0;
     int m;
 
     for (m = 0; m < smp->desc_size; m++, desc++) {
-        if (!(desc->type & DESC_TYPE_IN_LEN)) {
-            extra_len += desc->size;
+        if (desc->type & type || type == 0xFF) {
+            type_len += desc->size;
         }
     }
 
-    return extra_len;
+    return type_len; 
+}
+
+static int get_extra_len(struct smp_s *smp) 
+{
+    return get_len_by_type(smp, 0xFF) - get_len_by_type(smp, DESC_TYPE_IN_LEN);
 }
 
 static int get_intra_len(struct smp_s *smp) 
@@ -54,16 +58,7 @@ static int get_intra_len(struct smp_s *smp)
 #if CONFIG_SMP_FIXED_LENG
     return 0;
 #else
-    struct smp_descriptor *desc = smp->desc;
-    int intra_len = 0;
-    int m;
-
-    for (m = 0; m < smp->desc_size; m++, desc++) {
-        if (desc->type & DESC_TYPE_IN_LEN) {
-            intra_len += desc->size;
-        }
-    }
-    return intra_len;
+    return get_len_by_type(smp, DESC_TYPE_IN_LEN);
 #endif
 }
 
@@ -79,8 +74,8 @@ static int get_cmd_len(struct smp_s *smp)
     desc = find_desc_name(smp, "LENG");
     offset = find_offset_name(smp, "LENG");
 
-    //receive enough byte
     if (rz_rbuf_get_count(smp->buf) < offset + desc->size) { 
+        //receive not enough byte
         return 0; 
     } 
     
@@ -92,17 +87,16 @@ static int get_cmd_len(struct smp_s *smp)
             bufp = smp->buf->start; 
         }
     }
+    return cmd_len;
 #else
-    desc = find_desc_name(smp, "PAYL");
+    desc = find_desc_name(smp, "VDAT");
     return desc->size
 #endif
-
-    return cmd_len;
 }
 
-static int get_payload_len(struct smp_s *smp) 
+static int get_vdat_len(struct smp_s *smp) 
 {
-    return get_cmd_len(smp)-get_intra_len(smp);
+    return get_cmd_len(smp)-smp->intra_len;
 }
 
 // 0 = ok
@@ -139,8 +133,8 @@ static int verify_checksum(struct smp_s *smp)
 {
     unsigned char *bufp = smp->buf->head;
     struct smp_descriptor *desc = smp->desc;
-    char str_payload[] = "PAYL";
-    int payload_len;
+    char str_payload[] = "VDAT";
+    int vdat_len;
     int m, n;
     int cs, cs_calc = 0;
 
@@ -148,8 +142,8 @@ static int verify_checksum(struct smp_s *smp)
     //do all desc
     for (m = 0; m < smp->desc_size; m++, desc++) {
         if (!strncmp(desc->name, str_payload, 4)) {
-            payload_len = get_payload_len(smp);
-            for (n = 0; n < payload_len; n++) {
+            vdat_len = get_vdat_len(smp);
+            for (n = 0; n < vdat_len; n++) {
                 cs_calc += *bufp++;
                 if (bufp == smp->buf->end) {
                     bufp = smp->buf->start;   
@@ -178,23 +172,46 @@ static int verify_checksum(struct smp_s *smp)
     return SMP_RES_ERROR; //gg 
 }
 
+static void get_payload_offset_len(struct smp_s *smp, int *offset, int *len) {
+    struct smp_descriptor *desc = smp->desc;
+    int offset_flag = 0;
+    int m;
+
+    *offset = 0; 
+    *len = 0;
+    //get offset
+    //get len
+    for (m = 0; m < smp->desc_size; m++, desc++) {
+        if (desc->type & DESC_TYPE_PAYLOAD) {
+            offset_flag = 1;
+            if (desc->size == 0) {
+                *len += get_vdat_len(smp);
+            } else {
+                *len += desc->size; 
+            }
+        } else {
+            if (!offset_flag) {
+                *offset += desc->size;
+            }
+        }
+    }
+}
+
+
 void do_callback(struct smp_s *smp) 
 {
     int offset, len;
     unsigned char v;
 
-    
-    offset = find_offset_name(smp, "PAYL");
-    len = get_payload_len(smp);
+    //get offset and len
+    get_payload_offset_len(smp, &offset, &len);
     rz_rbuf_head_offset(smp->buf, offset);
 
     //call back zero copy
     (*smp->payload_upper_tx)(smp->buf->head, len); 
     
-    //pop data
-    for (int m = 0; m < len; m++) {
-        rz_rbuf_pop(smp->buf, &v);
-    }
+    //pop data to null
+    rz_rbuf_head_offset(smp->buf, len);
 }
 
 int new_regist(struct smp_s *smp, struct smp_descriptor *desc, int desc_size, int buf_size)
@@ -214,13 +231,16 @@ int new_regist(struct smp_s *smp, struct smp_descriptor *desc, int desc_size, in
         smp->max_cmd_len = buf_size;
     }
 
+    smp->intra_len = get_intra_len(smp);
+    smp->extra_len = get_extra_len(smp);
+
     return SMP_RES_OK;
 }
 
 void do_packet(struct smp_s *smp) 
 {
     struct rz_rbuf *rbuf = smp->buf;
-    int cmd_len, extra_len;
+    int cmd_len;
     int tmp, cnt;
     int rc;
     unsigned char value;
@@ -247,9 +267,8 @@ void do_packet(struct smp_s *smp)
         }
 
         //extra len
-        extra_len = get_extra_len(smp);
         cnt = rz_rbuf_get_count(smp->buf);
-        if (cnt < cmd_len + extra_len) {
+        if (cnt < cmd_len + smp->extra_len) {
             /* not enough data */
             break;
         }
@@ -285,20 +304,18 @@ int phy_rx(struct smp_s *smp, char *s, int len)
 #endif
 }
 
+
 int get_payload(struct smp_s *smp, char* buf) 
 {
-    int offset;
-    int len;
+    int offset = 0;
+    int len = 0;
     int rc;
     
     if (!smp->packet_flag) {
         return 0;
     }
 
-    //find payload offset
-    offset = find_offset_name(smp, "PAYL");
-    //find payload len
-    len = get_payload_len(smp);
+    get_payload_offset_len(smp, &offset, &len);
 
     //buf offset
     rc = rz_rbuf_head_offset(smp->buf, offset);
