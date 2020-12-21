@@ -83,7 +83,7 @@ static int get_cmd_len(struct smp_s *smp)
     for (m = 0; m < desc->size; m++) {
         cmd_len |= (int)*bufp << (8 * m);
         bufp++;
-        if (bufp = smp->buf->end) {
+        if (bufp == smp->buf->end) {
             bufp = smp->buf->start; 
         }
     }
@@ -116,7 +116,7 @@ static int verify_header(struct smp_s *smp)
     for (m = 0; m < desc->size; m++) {
         tmp_header |= (int)*(bufp) << (m * 8);
         bufp++;
-        if (bufp = smp->buf->end) {
+        if (bufp == smp->buf->end) {
             bufp = smp->buf->start; 
         }
     }
@@ -165,7 +165,7 @@ static int verify_checksum(struct smp_s *smp)
     //get checksum
     desc = find_desc_name(smp, "CHEC");
     cs = desc->value;
-    if (cs_calc & 0xFF == cs & 0xFF) {
+    if ((cs_calc & 0xFF) == (cs & 0xFF)) {
         return SMP_RES_OK; //pass
     }
 
@@ -210,6 +210,8 @@ static int is_calcLenFlag_raised(struct smp_s *smp) {
             return 0;
         }
     }
+
+    return -1;
 }
 
 //len = payload leng from upper
@@ -262,7 +264,7 @@ void do_callback(struct smp_s *smp)
     rz_rbuf_head_offset(smp->buf, offset);
 
     //call back zero copy
-    (*smp->payload_upper_tx)(smp->buf->head, len); 
+    (*smp->payload_upper_tx)((char *)smp->buf->head, len); 
     
     //pop data to null
     rz_rbuf_head_offset(smp->buf, len);
@@ -357,6 +359,8 @@ int phy_rx(struct smp_s *smp, char *s, int len)
 #if CONFIG_SMP_AUTO_DO_PACKET
     do_packet(smp);
 #endif
+
+    return 0;
 }
 
 
@@ -451,5 +455,7 @@ int smp_send_data(struct smp_s *smp, unsigned char *buf, int len)
         desc = find_desc_name(smp, "LENG"); 
         desc->value = 0;
     }
+
+    return 0;
 }
 
