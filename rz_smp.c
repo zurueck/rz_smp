@@ -425,11 +425,13 @@ int smp_send_data(struct smp_s *smp, unsigned char *buf, int len)
     bufp = buf;
     tmp = 0;
     for (m = 0; m < smp->desc_num; m++, desc++) {
-        if (desc->type & DESC_TYPE_PAYLOAD && !tmp) {
-            for (n = 0; n < len; n++) {
-                *p++ = *bufp++;
+        if (desc->type & DESC_TYPE_PAYLOAD) {
+            if (!tmp) {
+                for (n = 0; n < len; n++) {
+                    *p++ = *bufp++;
+                }
+                tmp = 1;    //has read payload
             }
-            tmp = 1;    //has read payload
         } else {
             for (n = 0; n < desc->size; n++) {
                 *p++ = (desc->value >> (8*n)) & 0xFF;   //little endian
